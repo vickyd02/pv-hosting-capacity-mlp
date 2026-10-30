@@ -1,0 +1,3 @@
+opendssdirect.py>=0.9
+numpy
+torch
