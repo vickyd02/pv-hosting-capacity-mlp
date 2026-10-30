@@ -1,0 +1,5 @@
+run,seeds,test_set,avg_err_pct_mean,avg_err_pct_std,max_err_pct_mean,max_err_pct_std,avg_dev_kw_mean,avg_dev_kw_std,rmse_kw_mean,rmse_kw_std,over_pct_mean,over_pct_std,mean_over_kw_mean,mean_over_kw_std,active_buses_mean
+repro_1layer,1,Test set 1,5.5615,0.0000,36.0263,0.0000,253.4586,0.0000,329.4008,0.0000,54.3519,0.0000,290.5386,0.0000,10.0
+repro_1layer,1,Test set 2,2.7928,0.0000,9.5893,0.0000,173.3801,0.0000,217.5763,0.0000,43.6111,0.0000,140.2233,0.0000,10.0
+repro_1layer,1,Test set 3,0.8451,0.0000,4.5882,0.0000,55.6190,0.0000,76.5968,0.0000,61.5972,0.0000,49.0110,0.0000,10.0
+repro_1layer,1,All,2.8444,0.0000,36.0263,0.0000,150.2993,0.0000,221.5855,0.0000,54.0278,0.0000,143.9918,0.0000,10.0

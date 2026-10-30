@@ -1,0 +1,7 @@
+inputs=pilot (36 features, 10 buses) state=hc alpha=1.0 lam=0.0 hidden=[615] epochs=367 train 229 s
+             avg err % max err % avg dev kW  RMSE kW  over % mean over kW mean-pred %
+Test set 1       5.562     36.03      253.5    329.4    54.4        290.5       27.46
+Test set 2       2.793      9.59      173.4    217.6    43.6        140.2       11.03
+Test set 3       0.845      4.59       55.6     76.6    61.6         49.0        9.96
+All              2.844     36.03      150.3    221.6    54.0        144.0       15.53
+inference 11.2 ms for 3600 scenarios

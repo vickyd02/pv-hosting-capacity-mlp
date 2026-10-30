@@ -261,21 +261,3 @@ If you use this code or dataset, please cite the original paper:
   doi     = {10.1016/j.apenergy.2026.127467}
 }
 ```
-
-Modeling choices that should be checked against the paper (all in `src/feeder.py`):
-
-- **PV placement:** distributed across all load buses. Pass `pv_buses=[...]` to `Feeder` to use specific buses.
-- **Limits:** `V_MAX`, `V_MIN`, `I_MAX` at the top of the file.
-- **Line ratings:** the OpenDSS model gives every line the 400 A default, which the main trunk exceeds at nominal load, so each line is rated at max(400 A, 1.25 x its nominal-load current). With these ratings the thermal limit binds in almost every scenario.
-- **Regulators:** taps are reset to neutral and re-settled on every power flow, so each HC label does not depend on solve order.
-
-## Training
-
-```
-python src/train.py                  # baseline: MSE, all node voltages
-python src/train.py --alpha 5        # asymmetric loss, overestimation weight 5
-python src/train.py --lam 1          # group lasso (proximal step on first-layer columns)
-python src/train.py --inputs pilot   # paper's pilot buses (fill PILOT_BUSES in train.py)
-```
-
-The MLP has two hidden layers of 64 ReLU units, standardized inputs and outputs, full-batch Adam (lr 1e-3), and early stopping on validation loss. The split is 70/15/15. Reported metrics are test MAE, MAPE, R2, the share and mean size of overestimates, and inference time.
