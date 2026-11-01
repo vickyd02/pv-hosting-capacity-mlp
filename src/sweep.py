@@ -6,6 +6,9 @@ sweep can be stopped and restarted.
   python src/sweep.py                  # all experiments, seeds 0 1 2
   python src/sweep.py --seeds 0 --only repro alpha
   python src/sweep.py --plot-only      # rebuild results/summary.csv and the figures
+  python src/sweep.py --jobs 4         # run 4 trainings at once (one CPU thread each)
+  python src/sweep.py --list           # print the job list (for a Slurm array)
+  python src/sweep.py --index 7        # run only job 7 of that list (one Slurm array task)
 """
 import argparse
 import glob
@@ -13,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import numpy as np
 
 EXPERIMENTS = {
@@ -36,23 +40,84 @@ parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
 parser.add_argument("--only", nargs="+", default=list(EXPERIMENTS))
 parser.add_argument("--out", default="results")
 parser.add_argument("--plot-only", action="store_true")
+parser.add_argument("--jobs", type=int, default=1, help="trainings to run at once")
+parser.add_argument("--threads", type=int, default=None,
+                    help="CPU threads per training (default: 1 when --jobs > 1)")
+parser.add_argument("--list", action="store_true", help="print all jobs and exit")
+parser.add_argument("--index", type=int, default=None, help="run only this job, then exit")
 args = parser.parse_args()
 os.makedirs(args.out, exist_ok=True)
 here = os.path.dirname(os.path.abspath(__file__))
 
+# Full job list, in a fixed order so --index is stable across Slurm array tasks.
+jobs = []
+for group in args.only:
+    for name, flags in EXPERIMENTS[group].items():
+        for s in args.seeds:
+            jobs.append((name, flags, s, os.path.join(args.out, f"{name}_seed{s}.json")))
+
+
+def command(job):
+    name, flags, s, path = job
+    return [sys.executable, os.path.join(here, "train.py"), *flags, "--seed", str(s),
+            "--json", path]
+
+
+def data_missing(flags):
+    return "--data" in flags and not os.path.exists(flags[flags.index("--data") + 1])
+
+
+threads = args.threads or (1 if args.jobs > 1 or args.index is not None else None)
+env = dict(os.environ)
+if threads:
+    env.update(OMP_NUM_THREADS=str(threads), MKL_NUM_THREADS=str(threads))
+
+if args.list:
+    for i, j in enumerate(jobs):
+        print(i, " ".join(command(j)[1:]))
+    raise SystemExit
+
+if args.index is not None:
+    job = jobs[args.index]
+    if os.path.exists(job[3]):
+        print(f"{job[3]} exists, skipping")
+    elif data_missing(job[1]):
+        raise SystemExit(f"data file for {job[0]} not found")
+    else:
+        print(f"running {job[0]} seed {job[2]}", flush=True)
+        subprocess.run(command(job), check=True, env=env)
+    raise SystemExit
+
 if not args.plot_only:
-    for group in args.only:
-        for name, flags in EXPERIMENTS[group].items():
-            if "--data" in flags and not os.path.exists(flags[flags.index("--data") + 1]):
-                print(f"skipping {name}: {flags[flags.index('--data') + 1]} not found")
-                break
-            for s in args.seeds:
-                path = os.path.join(args.out, f"{name}_seed{s}.json")
-                if os.path.exists(path):
-                    continue
-                print(f"running {name} seed {s}", flush=True)
-                subprocess.run([sys.executable, os.path.join(here, "train.py"), *flags,
-                                "--seed", str(s), "--json", path], check=True)
+    todo = []
+    for j in jobs:
+        if os.path.exists(j[3]):
+            continue
+        if data_missing(j[1]):
+            print(f"skipping {j[0]} seed {j[2]}: data file not found")
+            continue
+        todo.append(j)
+    print(f"{len(todo)} runs to do, {args.jobs} at a time", flush=True)
+    running, failed = [], []
+    while todo or running:
+        while todo and len(running) < args.jobs:
+            j = todo.pop(0)
+            log = open(j[3].replace(".json", ".log"), "w")
+            print(f"running {j[0]} seed {j[2]}", flush=True)
+            running.append((j, subprocess.Popen(command(j), env=env, stdout=log,
+                                                stderr=subprocess.STDOUT), log))
+        for item in list(running):
+            j, proc, log = item
+            if proc.poll() is not None:
+                log.close()
+                running.remove(item)
+                status = "done" if proc.returncode == 0 else f"FAILED (see {log.name})"
+                if proc.returncode != 0:
+                    failed.append(j[0])
+                print(f"{status}: {j[0]} seed {j[2]}", flush=True)
+        time.sleep(2)
+    if failed:
+        print("failed runs:", failed)
 
 # ---------------- summary ----------------
 runs = {}

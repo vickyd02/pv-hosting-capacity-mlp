@@ -1,0 +1,3 @@
+0 runs to do, 4 at a time
+wrote results/summary.csv (14 runs)
+figures saved

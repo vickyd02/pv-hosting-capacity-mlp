@@ -1,0 +1,76 @@
+{
+ "args": {
+  "data": "data/hc_dataset_vonly.npz",
+  "inputs": "pilot",
+  "state": "hc",
+  "alpha": 1.0,
+  "lam": 0.0,
+  "hidden": [
+   615
+  ],
+  "lr": 0.001,
+  "batch": 32,
+  "epochs": 1500,
+  "patience": 100,
+  "seed": 0,
+  "json": "results/vonly_repro_seed0.json"
+ },
+ "results": {
+  "Test set 1": {
+   "avg_err_pct": 4.449706732215255,
+   "max_err_pct": 16.887067562463333,
+   "avg_dev_kw": 460.40592460168733,
+   "rmse_kw": 580.6721332605131,
+   "over_pct": 46.94444444444444,
+   "mean_over_kw": 448.01582821022123,
+   "mean_pred_err_pct": 71.98568636924895,
+   "n": 1080
+  },
+  "Test set 2": {
+   "avg_err_pct": 2.795630139208437,
+   "max_err_pct": 8.996130898594856,
+   "avg_dev_kw": 462.00859536009807,
+   "rmse_kw": 581.8243658486044,
+   "over_pct": 46.111111111111114,
+   "mean_over_kw": 391.258208676275,
+   "mean_pred_err_pct": 22.506113423516286,
+   "n": 1080
+  },
+  "Test set 3": {
+   "avg_err_pct": 0.8398059299412673,
+   "max_err_pct": 3.953523586128961,
+   "avg_dev_kw": 163.66410089118614,
+   "rmse_kw": 259.23807478918604,
+   "over_pct": 33.75,
+   "mean_over_kw": 147.79237523981573,
+   "mean_pred_err_pct": 18.860734567368617,
+   "n": 1440
+  },
+  "All": {
+   "avg_err_pct": 2.5095234334036145,
+   "max_err_pct": 16.887067562463333,
+   "avg_dev_kw": 342.18999634501006,
+   "rmse_kw": 479.15724713322993,
+   "over_pct": 41.41666666666667,
+   "mean_over_kw": 331.1989987859943,
+   "mean_pred_err_pct": 35.891833764777026,
+   "n": 3600
+  }
+ },
+ "epochs": 455,
+ "train_s": 113.06616926193237,
+ "infer_ms": 3.438711166381836,
+ "n_active_buses": 10,
+ "active_buses": [
+  "17",
+  "25",
+  "31",
+  "38",
+  "45",
+  "54",
+  "61",
+  "74",
+  "84",
+  "95"
+ ]
+}
