@@ -40,7 +40,7 @@ Siddique et al. replace the search with a **surrogate model**: a feed-forward ne
 1. **A faithful, open reproduction.** It follows the paper's HC definition, Monte Carlo procedure, network, hyperparameters, test sets, and metrics. Every detail the paper leaves unstated is documented and exposed as a parameter (see [Assumptions](#assumptions-where-the-paper-is-unspecified)).
 2. **Asymmetric loss (Modification 1).** Overestimating HC approves PV that will violate a limit, while underestimating only leaves capacity unused. The loss weights overestimates by α ≥ 1, giving a utility one direct control over how often the model errs on the unsafe side.
 3. **Bus-level group lasso (Modification 2).** The paper picks pilot buses in a separate multi-objective optimization before training. Here the network sees all 132 buses, and a group-lasso penalty, applied as a proximal step, removes whole buses during training. The number of buses that survive measures how much metering the task actually needs, and is directly comparable to the paper's Table 4.
-4. **A diagnosis of where the method works.** The reproduction shows when pilot-bus voltages contain enough information to predict HC and when they do not. It also identifies two features of the paper's setup that make its low error easier to reach (see [Findings](#findings-so-far)).
+4. **A diagnosis of where the method works.** The reproduction shows when pilot-bus voltages contain enough information to predict HC and when they do not. It also identifies two features of the paper's setup that make its low error easier to reach (see [Results](#results)).
 
 ### Scope
 
@@ -118,20 +118,41 @@ This is the exact proximal operator of λ Σ_b ‖W_b‖₂. Unlike adding the p
 
 ---
 
-## Findings so far
+## Results
 
-Seed 0, pilot-bus inputs, 1 hidden layer. Three-seed results are produced by `src/sweep.py` and written to `results/summary.csv`.
+All values are means over 3 seeds on held-out PV placements (`results/summary.csv`).
 
-| Test set | Paper avg error | Ours avg error | Ours max error | Ours RMSE (kW) | Predict-the-mean avg error |
+**Reproduction (10 pilot buses, 1 hidden layer).**
+
+| Test set | Paper avg error | Ours avg error | Ours max error | Ours RMSE (kW) | Predict-the-mean |
 |---|---|---|---|---|---|
-| 1 (10–30%) | 0.71% | 5.56% | 36.0% | 329 | 27.46% |
-| 2 (40–60%) | 0.59% | 2.79% | 9.6% | 218 | 11.03% |
-| 3 (70–100%) | 0.58% | 0.85% | 4.6% | 77 | 9.96% |
+| 1 (10–30%) | 0.71% | 5.79 ± 0.26% | 34.5% | 347 | 27.46% |
+| 2 (40–60%) | 0.59% | 2.43 ± 0.26% | 8.6% | 187 | 11.03% |
+| 3 (70–100%) | 0.58% | 0.90 ± 0.08% | 4.9% | 83 | 9.96% |
 
-- **High penetration reproduces.** At 70–100%, 10 pilot buses predict HC within 0.85%. Inference takes about 3 µs per scenario, against about 20 ms for the OpenDSS search.
-- **Low penetration does not, and the likely cause is identified.** Under the line ratings used here, the thermal limit sets HC in every scenario checked. With only 8 PV units, HC depends on which line overloads first, which depends on exactly where the units sit. Pilot voltages capture that only partly. The paper does not report its line ratings, and the `--voltage-only` sensitivity case tests this explanation directly.
-- **Input timing is essential.** With no PV connected, the voltages depend only on the hour: the 24,000 rows contain just 23 distinct voltage vectors, so no model can separate PV layouts. Inputs must be taken at the HC point, which is the most natural reading of the paper's Steps 7–8.
-- **The labels are coarse at high penetration.** Equal 10 kW steps across 85 units mean each step adds 850 kW, leaving only 3 distinct HC values at 100% penetration. This, together with inputs measured at the HC point, makes a low percentage error easier to reach.
+**Modifications (all 3,600 test scenarios).**
+
+| α | Avg error | Overestimated | | λ | Active buses (range) | Avg error |
+|---|---|---|---|---|---|---|
+| 1 (MSE) | 2.83% | 47.6% | | 0 | 132 | 0.32% |
+| 2 | 2.94% | 39.7% | | 0.03 | 132 | 0.46% |
+| 5 | 3.35% | 25.3% | | 0.1 | 132 | 0.59% |
+| 10 | 3.57% | 16.8% | | 0.3 | 10 (6–15) | 0.77% |
+| | | | | 1 | 22 (10–31) | 1.34% |
+
+![Asymmetric loss trade-off](results/fig_alpha.png) ![Error vs. buses used](results/fig_lasso.png)
+
+**Key findings.**
+
+- **High penetration reproduces.** At 70–100%, 10 pilot buses predict HC within 0.90%, close to the paper's 0.58%, in about 3 µs per scenario instead of about 20 ms for the OpenDSS search.
+- **The low-penetration gap comes from the pilot buses, not the line ratings.** Removing the thermal limit only lowers Test set 1 error from 5.79% to 5.26%. Using all 132 buses gives 0.32% overall, and 3 hidden layers do not help (6.17%, 2.57%, 0.87%). The placement information is in the voltages, but not at these 10 buses.
+- **Asymmetric loss gives a tunable safety margin.** α = 5 nearly halves the overestimation rate (47.6% → 25.3%) for 0.5 points of average error.
+- **Group lasso finds better buses than the pilot set.** At λ = 0.3 it keeps 6–15 buses (10 on average) with 0.77 ± 0.02% error, beating the pilot buses in this setup (2.83%) and the paper's 10 non-pilot buses (11.8–15.4%). Every run keeps the same core at the feeder head (150, 150r, 149, 160r, 610) and, at λ = 0.3, none of the paper's pilot buses. These buses see the total power leaving the feeder, which at the HC point is set mostly by the installed PV.
+- **Inputs must be measured at the HC point.** With no PV connected, the voltages depend only on the hour (23 distinct vectors in 24,000 rows), and the error is 15.75%, no better than predicting the mean.
+- **Labels are coarse at high penetration.** Equal 10 kW steps across 85 units mean each step adds 850 kW, leaving only 3 distinct HC values at 100% penetration.
+- **Limitations.** Which buses group lasso keeps beyond the shared core varies by seed: neighboring buses carry nearly the same information, and Adam's normalized steps can revive removed buses. The results cover one feeder, one loadshape, one line-rating rule, and equal-size PV at full output.
+
+The full write-up is in [`report.tex`](report.tex).
 
 ---
 
@@ -146,9 +167,13 @@ pv-hosting-capacity-mlp/
 │   ├── feeder.py            OpenDSS wrapper: loads, PV placement, limits, bisection HC search
 │   ├── generate_data.py     Monte Carlo scenario generation (full or chunked by penetration level)
 │   ├── train.py             MLP training and evaluation, both modifications, JSON output
-│   └── sweep.py             Multi-seed experiment grid, results/summary.csv, figures
+│   ├── sweep.py             Multi-seed experiment grid (--jobs for parallel, --index for Slurm)
+│   └── report_numbers.py    Prints every value used in the report
+├── scripts/
+│   └── sherlock_sweep.sbatch  Slurm job array for running the sweep on Sherlock
 ├── results/                 Run outputs (JSON + text), summary.csv, fig_alpha.png, fig_lasso.png
 ├── requirements.txt
+├── report.tex           3-page technical report (LaTeX)
 └── README.md
 ```
 
@@ -225,7 +250,11 @@ python src/train.py --data data/hc_dataset_vonly.npz   # voltage-only sensitivit
 python src/sweep.py                          # all experiments, seeds 0 1 2 (several CPU-hours)
 python src/sweep.py --seeds 0 --only repro   # a quick subset
 python src/sweep.py --plot-only              # rebuild summary.csv and figures from saved runs
+python src/sweep.py --jobs 4                 # run 4 trainings at once (much faster on a laptop)
+python src/report_numbers.py                 # print every value used in the report
 ```
+
+On a Slurm cluster such as Sherlock, `sbatch --array=0-41 scripts/sherlock_sweep.sbatch` runs every training as its own task.
 
 The sweep covers the reproduction (1 and 3 layers), the no-PV ablation, α ∈ {2, 5, 10}, λ ∈ {0, 0.03, 0.1, 0.3, 1}, the voltage-only case (if that dataset exists), and both modifications combined. Finished runs are skipped, so the sweep can be stopped and resumed.
 
